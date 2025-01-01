@@ -40,8 +40,7 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Layout set with activity_main");
 
         // Inisialisasi RecyclerView
-        RecyclerView recyclerView;
-        recyclerView = findViewById(R.id.recycler_view);
+        RecyclerView recyclerView = findViewById(R.id.recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
         // Inisialisasi adapter
@@ -72,47 +71,38 @@ public class MainActivity extends AppCompatActivity {
         buttonAddTask.setOnClickListener(v -> addNewTask());
 
         // Mengatur Listener untuk EditText tanggal
-        editTextDate.setOnClickListener(v -> showDatePickerDialog());
+        editTextDate.setOnClickListener(v -> showDatePickerDialog(editTextDate));
 
         // Mengatur Listener untuk TaskAdapter
-        adapter.setOnItemClickListener(new OnItemClickListener() {
+        adapter.setOnItemClickListener(new TaskAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(Task task) {
-                Toast.makeText(MainActivity.this, "Task: " + task.getTitle(), Toast.LENGTH_SHORT).show();
+                showTaskDetail(task); // Menampilkan detail task
             }
 
             @Override
             public void onItemEdit(Task task) {
-                Log.d(TAG, "Edit Task: " + task.getTitle());
-                // Mengedit task
-                editTask(task);
-
+                editTask(task); // Mengedit task
             }
 
             @Override
             public void onItemDelete(Task task) {
-                Log.d(TAG, "Delete Task: " + task.getTitle());
-                // Menghapus task
-                deleteTask(task);
-
+                deleteTask(task); // Menghapus task
             }
 
             @Override
             public void onTaskChecked(Task task, boolean isChecked) {
                 task.setCompleted(isChecked);
-                Log.d(TAG, "Task " + task.getTitle() + " set to completed: " + isChecked);
-                Toast.makeText(MainActivity.this, "Task updated!", Toast.LENGTH_SHORT).show();
                 taskRepository.update(task); // Update task ke database
-                refreshTaskList();
+                refreshTaskList();;
             }
         });
-
         // Menampilkan semua task yang ada
         refreshTaskList();
     }
 
     // Method untuk menampilkan DatePickerDialog
-    private void showDatePickerDialog() {
+    private void showDatePickerDialog(EditText editTextDate) {
         // Mengambil tanggal saat ini
         try {
             Calendar calendar = Calendar.getInstance();
@@ -155,18 +145,17 @@ public class MainActivity extends AppCompatActivity {
         Task newTask = new Task(title, description, false, date);
         taskRepository.insert(newTask); // Simpan task ke database
         Toast.makeText(this, "Task added!", Toast.LENGTH_SHORT).show();
+        refreshTaskList(); // Refresh daftar task
 
         // Kosongkan input field setelah task ditambahkan
         editTextTitle.setText("");
         editTextDescription.setText("");
         editTextDate.setText("");
-
-        refreshTaskList();
     }
 
     // Method untuk mengambil data task dan menampilkannya di RecyclerView
     private void refreshTaskList() {
-        taskRepository.getAllTasks().observe(this, tasks -> {
+        taskRepository.getAllTasksOrderedByDate().observe(this, tasks -> {
             if (tasks == null || tasks.isEmpty()) {
                 Log.d(TAG, "Tidak ada task yang ditemukan");
             } else {
@@ -180,29 +169,69 @@ public class MainActivity extends AppCompatActivity {
     private void showTaskDetail(Task task) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(task.getTitle());
-        builder.setMessage(task.getDescription());
+        builder.setMessage("Description: " + task.getDescription() + "\nDate: " + task.getDate());
         builder.setPositiveButton("OK", (dialog, which) -> dialog.dismiss());
         builder.show();
     }
 
     // Fungsi untuk mengedit task
     private void editTask(Task task) {
-        // Contoh sederhana: menambahkan "(Edited)" ke judul task
-        task.setTitle(task.getTitle() + " (Edited)");
-        adapter.notifyDataSetChanged();
-        Toast.makeText(this, "Task edited!", Toast.LENGTH_SHORT).show();
+        // Membuat dialog untuk mengedit task
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Edit Task");
+
+        // Menambahkan form input untuk judul, deskripsi, dan tanggal
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_edit_task, null);
+        EditText editTextTitle = dialogView.findViewById(R.id.edit_text_edit_title);
+        EditText editTextDescription = dialogView.findViewById(R.id.edit_text_edit_description);
+        EditText editTextDate = dialogView.findViewById(R.id.edit_text_edit_date);
+
+        // Mengisi EditText dengan data task saat ini
+        editTextTitle.setText(task.getTitle());
+        editTextDescription.setText(task.getDescription());
+        editTextDate.setText(task.getDate());
+
+        builder.setView(dialogView);
+        builder.setPositiveButton("Save", (dialog, which) -> {
+            String newTitle = editTextTitle.getText().toString().trim();
+            String newDescription = editTextDescription.getText().toString().trim();
+            String newDate = editTextDate.getText().toString().trim();
+
+            if (newTitle.isEmpty() || newDescription.isEmpty() || newDate.isEmpty()) {
+                Toast.makeText(MainActivity.this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Update task dengan data baru
+            task.setTitle(newTitle);
+            task.setDescription(newDescription);
+            task.setDate(newDate);
+
+            taskRepository.update(task); // Update task di database
+            refreshTaskList(); // Refresh daftar task
+
+            Toast.makeText(MainActivity.this, "Task updated!", Toast.LENGTH_SHORT).show();
+        });
+
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+        builder.show();
     }
 
     // Fungsi untuk menghapus task
     private void deleteTask(Task task) {
+        // Menampilkan dialog konfirmasi sebelum menghapus task
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Delete Task");
         builder.setMessage("Are you sure you want to delete this task?");
         builder.setPositiveButton("Yes", (dialog, which) -> {
+            // Menghapus task dari database
             taskRepository.delete(task);
-            adapter.notifyDataSetChanged();
+            refreshTaskList(); // Refresh daftar task setelah penghapusan
+
             Toast.makeText(MainActivity.this, "Task deleted!", Toast.LENGTH_SHORT).show();
-        }); builder.setNegativeButton("No", (dialog, which) -> dialog.dismiss());
+        });
+
+        builder.setNegativeButton("No", (dialog, which) -> dialog.dismiss()); // Menutup dialog tanpa menghapus
         builder.show();
         refreshTaskList(); // Menampilkan task terbaru
     }

@@ -16,7 +16,7 @@ public interface TasksManager {
     @Delete
     void deleteTask(Task task);
 
-    @Query("SELECT * FROM task_table ORDER BY id DESC")
-    LiveData<List<Task>> getAllTasks();
+    @Query("SELECT * FROM task_table ORDER BY strftime('%s', date) ASC")
+    LiveData<List<Task>> getAllTasksOrderedByDate();
 
 }

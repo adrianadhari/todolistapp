@@ -17,7 +17,10 @@ public class TaskRepo {
     public TaskRepo(Application application) {
         TaskDB db = TaskDB.getInstance(application);
         tasksManager = db.tasksManager();
-        allTasks = tasksManager.getAllTasks();
+        allTasks = tasksManager.getAllTasksOrderedByDate();
+    }
+    public LiveData<List<Task>> getAllTasksOrderedByDate() {
+        return tasksManager.getAllTasksOrderedByDate();
     }
 
     public void insert(Task task) {
